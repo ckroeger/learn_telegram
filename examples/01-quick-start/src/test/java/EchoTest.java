@@ -53,6 +53,22 @@ class EchoTest {
     }
 
     @Test
+    void spiegeltAuchSehrLangeNachrichten() throws Exception {
+        // Telegram erlaubt bis zu 4096 Zeichen. Mit vielen Zeilenumbrüchen (je zwei Zeichen im JSON) ist das der
+        // ungünstigste Fall für das Lesen des Textes.
+        String lang = "Zeile\n".repeat(600) + "x".repeat(496);
+        try (FakeTelegramServer fake = FakeTelegramServer.start()) {
+            fake.enqueueTextMessage(5, lang);
+
+            mitLaufendemBot(fake, () -> {
+                RecordedRequest gesendet = fake.awaitRequests("sendMessage", 1, Duration.ofSeconds(5)).get(0);
+                assertTrue(gesendet.bodyContains("\"chat_id\":5"));
+                assertTrue(gesendet.bodyContains("x".repeat(496) + "\"}"), "Text unvollständig");
+            });
+        }
+    }
+
+    @Test
     void bestaetigtUpdatesPerOffset() throws Exception {
         try (FakeTelegramServer fake = FakeTelegramServer.start()) {
             fake.enqueueTextMessage(1, "eins");

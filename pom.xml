@@ -15,6 +15,7 @@
     <module>examples/01-quick-start</module>
     <module>examples/02-einstieg</module>
     <module>examples/03-long-polling</module>
+    <module>examples/04-nachrichten-senden</module>
   </modules>
 
   <properties>

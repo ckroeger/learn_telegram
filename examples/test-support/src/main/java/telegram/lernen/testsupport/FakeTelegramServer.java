@@ -262,12 +262,33 @@ public final class FakeTelegramServer implements AutoCloseable {
 
     /** Liefert den Text als JSON-Literal (mit Anführungszeichen). */
     private static String text(String body, String query) {
-        Matcher json = Pattern.compile("\"text\"\\s*:\\s*(\"(?:[^\"\\\\]|\\\\.)*\")").matcher(body);
-        if (json.find()) {
-            return json.group(1);
+        String literal = jsonLiteral(body, "text");
+        if (literal != null) {
+            return literal;
         }
         String formular = formularWert(body + "&" + query, "text");
         return jsonText(formular == null ? "" : formular);
+    }
+
+    /**
+     * Sucht {@code "schluessel": "..."} und gibt den String samt Anführungszeichen zurück. Mit einer Schleife statt
+     * einer Regex, weil {@code (?:[^"\\]|\\.)*} bei langen Texten den Stack überläuft.
+     */
+    static String jsonLiteral(String json, String schluessel) {
+        Matcher kopf = Pattern.compile("\"" + Pattern.quote(schluessel) + "\"\\s*:\\s*\"").matcher(json);
+        if (!kopf.find()) {
+            return null;
+        }
+        int start = kopf.end() - 1;
+        for (int i = start + 1; i < json.length(); i++) {
+            char c = json.charAt(i);
+            if (c == '\\') {
+                i++;
+            } else if (c == '"') {
+                return json.substring(start, i + 1);
+            }
+        }
+        return null;
     }
 
     private static String formularWert(String formular, String name) {

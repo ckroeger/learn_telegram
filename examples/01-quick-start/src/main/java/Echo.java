@@ -47,7 +47,8 @@ public class Echo {
                 offset = Long.parseLong(finden(update, "^(\\d+)")) + 1;
 
                 String chatId = finden(update, "\"chat\":\\{\"id\":(-?\\d+)");
-                String text = finden(update, "\"text\":\"((?:[^\"\\\\]|\\\\.)*)\"");
+                // Possessive Quantoren (*+): Sonst läuft der Stack bei langen Texten über (Telegram erlaubt 4096 Zeichen).
+                String text = finden(update, "\"text\":\"([^\"\\\\]*+(?:\\\\.[^\"\\\\]*+)*+)\"");
                 if (chatId != null && text != null) {
                     // Der Text bleibt so, wie er im JSON stand (mit Escapes), und ist damit wieder gültiges JSON.
                     aufrufen("sendMessage", "{\"chat_id\":" + chatId + ",\"text\":\"" + text + "\"}");

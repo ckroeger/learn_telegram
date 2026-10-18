@@ -96,6 +96,14 @@ class FakeTelegramServerTest {
     }
 
     @Test
+    void sendMessageKommtMitMaximalLangemTextZurecht() throws Exception {
+        String text = "Zeile\\n".repeat(700) + "x".repeat(100);
+        String antwort = post("sendMessage", "{\"chat_id\":1,\"text\":\"" + text + "\"}").body();
+        assertTrue(antwort.contains("\"text\":\"" + text + "\""));
+        assertEquals(1, fake.requests("sendMessage").size());
+    }
+
+    @Test
     void sendMessageVersteht_Formulardaten() throws Exception {
         HttpRequest anfrage = HttpRequest.newBuilder(URI.create(fake.baseUrl() + "/botTOKEN/sendMessage"))
                 .header("Content-Type", "application/x-www-form-urlencoded")

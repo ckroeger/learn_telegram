@@ -12,18 +12,27 @@
 
   <modules>
     <module>examples/test-support</module>
-    <module>examples/00-leeres-beispiel</module>
     <module>examples/01-quick-start</module>
+    <module>examples/02-einstieg</module>
+    <module>examples/03-long-polling</module>
   </modules>
 
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <junit.version>5.11.4</junit.version>
+    <jackson.version>2.22.4</jackson.version>
   </properties>
 
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>com.fasterxml.jackson</groupId>
+        <artifactId>jackson-bom</artifactId>
+        <version>${jackson.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
       <dependency>
         <groupId>org.junit</groupId>
         <artifactId>junit-bom</artifactId>
@@ -35,6 +44,18 @@
   </dependencyManagement>
 
   <build>
+    <plugins>
+      <!-- exec:java mit -am läuft auch in Parent und test-support; dort gibt es nichts zu starten.
+           inherited=false: gilt nur für den Parent, nicht für die Lektionsmodule. -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <inherited>false</inherited>
+        <configuration>
+          <skip>true</skip>
+        </configuration>
+      </plugin>
+    </plugins>
     <pluginManagement>
       <plugins>
         <plugin>

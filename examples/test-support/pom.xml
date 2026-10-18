@@ -14,6 +14,11 @@
   <artifactId>test-support</artifactId>
   <name>Test-Support: Fake der Telegram Bot API</name>
 
+  <properties>
+    <!-- nichts zu starten, siehe Parent-POM (exec:java mit -am) -->
+    <exec.skip>true</exec.skip>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.junit.jupiter</groupId>

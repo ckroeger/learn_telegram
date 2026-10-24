@@ -18,6 +18,7 @@
     <module>examples/04-nachrichten-senden</module>
     <module>apps/telegram-client</module>
     <module>examples/05-interaktion</module>
+    <module>examples/06-webhooks</module>
     <module>apps/echo-befehls-bot</module>
     <module>examples/07-bearbeiten-loeschen</module>
     <module>apps/erinnerungs-bot</module>

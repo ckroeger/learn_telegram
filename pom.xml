@@ -16,6 +16,9 @@
     <module>examples/02-einstieg</module>
     <module>examples/03-long-polling</module>
     <module>examples/04-nachrichten-senden</module>
+    <module>apps/telegram-client</module>
+    <module>examples/05-interaktion</module>
+    <module>apps/echo-befehls-bot</module>
   </modules>
 
   <properties>

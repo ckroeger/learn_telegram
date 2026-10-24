@@ -8,12 +8,10 @@ import java.io.UncheckedIOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import telegram.lernen.client.Befehl;
 import telegram.lernen.client.Tastaturen;
@@ -30,19 +28,26 @@ public class ErinnerungsBot {
 
     static final int MAX_OFFEN = 20;
     static final Duration SPAETER = Duration.ofMinutes(5);
+    /** Ab dieser Verspätung weist die Erinnerung darauf hin, dass sie zu spät kommt. */
+    static final Duration TOLERANZ = Duration.ofMinutes(1);
 
     private final TelegramClient client;
     private final String eigenerName;
+    private final Erinnerungsspeicher speicher;
     private final Planer planer;
     private final Clock uhr;
-    private final AtomicLong naechsteId = new AtomicLong(1);
-    /** Erinnerungen, die noch laufen, und solche, die ausgelöst wurden und auf "Erledigt" oder "Später" warten. */
-    private final Map<Long, Erinnerung> offen = new ConcurrentHashMap<>();
-    private final Map<Long, Erinnerung> ausgeloest = new ConcurrentHashMap<>();
+    /** Die Möglichkeiten, laufende Timer abzusagen. Sie gibt es nur im Programm, nicht im Speicher. */
+    private final Map<Long, Runnable> abbrueche = new ConcurrentHashMap<>();
 
     ErinnerungsBot(TelegramClient client, String eigenerName, Planer planer, Clock uhr) {
+        this(client, eigenerName, new SpeicherImArbeitsspeicher(), planer, uhr);
+    }
+
+    ErinnerungsBot(TelegramClient client, String eigenerName, Erinnerungsspeicher speicher, Planer planer,
+            Clock uhr) {
         this.client = client;
         this.eigenerName = eigenerName;
+        this.speicher = speicher;
         this.planer = planer;
         this.uhr = uhr;
     }
@@ -121,21 +126,52 @@ public class ErinnerungsBot {
                     + "Zeit: Zahl mit s, m, h oder d, höchstens 7d.");
             return;
         }
-        if (offen.values().stream().filter(e -> e.chatId == chatId).count() >= MAX_OFFEN) {
+        if (speicher.anzahlOffen(chatId) >= MAX_OFFEN) {
             senden(chatId, "Du hast schon " + MAX_OFFEN + " offene Erinnerungen. Warte, bis eine fällig ist.");
             return;
         }
-        long id = naechsteId.getAndIncrement();
         String text = teile[1].strip();
+        Instant faellig = uhr.instant().plus(dauer.get());
 
-        // Erst den Status senden, dann planen: Die Statusnachricht wird später bearbeitet oder gelöscht.
-        JsonNode status = statusSenden(chatId, id, "⏳ Erinnerung in " + Dauer.text(dauer.get()) + ": " + text);
-        Erinnerung erinnerung = new Erinnerung(id, chatId, text, status.get("message_id").asLong(),
-                uhr.instant().plus(dauer.get()));
-        offen.put(id, erinnerung);
-        erinnerung.abbruch = planer.planen(dauer.get(), () -> ausfuehren(id));
+        // Erst speichern, dann senden: Die ID gehört in die "Abbrechen"-Taste. Scheitert das Senden, wird zurückgerollt.
+        Erinnerung erinnerung = speicher.anlegen(chatId, text, 0, faellig);
+        try {
+            JsonNode status = statusSenden(chatId, erinnerung.id(),
+                    "⏳ Erinnerung in " + Dauer.text(dauer.get()) + ": " + text);
+            speicher.aktualisieren(erinnerung.id(), status.get("message_id").asLong(), faellig);
+        } catch (IOException | InterruptedException | RuntimeException e) {
+            speicher.entfernen(erinnerung.id(), Erinnerungsspeicher.Zustand.OFFEN);
+            throw e;
+        }
+        planen(erinnerung.id(), dauer.get());
     }
     // #endregion erinnere
+
+    private void planen(long id, Duration verzoegerung) {
+        abbrueche.put(id, planer.planen(verzoegerung, () -> ausfuehren(id)));
+    }
+
+    // #region wiederaufnehmen
+    /**
+     * Nimmt nach einem Neustart die offenen Erinnerungen aus dem Speicher wieder auf. Verpasste kommen sofort.
+     * Zeilen ohne Statusnachricht stammen von einem Abbruch zwischen Speichern und Senden und werden verworfen.
+     *
+     * @return die Anzahl der wieder eingeplanten Erinnerungen
+     */
+    int wiederaufnehmen() {
+        int anzahl = 0;
+        for (Erinnerung erinnerung : speicher.alleOffenen()) {
+            if (erinnerung.statusNachrichtId() == 0) {
+                speicher.entfernen(erinnerung.id(), Erinnerungsspeicher.Zustand.OFFEN);
+                continue;
+            }
+            Duration rest = Duration.between(uhr.instant(), erinnerung.faelligUm());
+            planen(erinnerung.id(), rest.isNegative() ? Duration.ZERO : rest);
+            anzahl++;
+        }
+        return anzahl;
+    }
+    // #endregion wiederaufnehmen
 
     private JsonNode statusSenden(long chatId, long id, String text) throws IOException, InterruptedException {
         ObjectNode parameter = TelegramClient.parameter().put("chat_id", chatId).put("text", text);
@@ -148,19 +184,16 @@ public class ErinnerungsBot {
     }
 
     private void liste(long chatId) throws IOException, InterruptedException {
-        List<Erinnerung> eigene = offen.values().stream()
-                .filter(e -> e.chatId == chatId)
-                .sorted(Comparator.comparing(e -> e.faelligUm))
-                .toList();
+        List<Erinnerung> eigene = speicher.offene(chatId);
         if (eigene.isEmpty()) {
             senden(chatId, "Keine offenen Erinnerungen.");
             return;
         }
         StringBuilder text = new StringBuilder("Offene Erinnerungen:");
         for (Erinnerung e : eigene) {
-            Duration rest = Duration.between(uhr.instant(), e.faelligUm);
-            text.append("\n- ").append(e.text).append(" (in ")
-                    .append(Dauer.text(rest.isNegative() ? Duration.ZERO.plusSeconds(1) : rest)).append(")");
+            Duration rest = Duration.between(uhr.instant(), e.faelligUm());
+            text.append("\n- ").append(e.text()).append(" (in ")
+                    .append(Dauer.text(rest.isNegative() ? Duration.ofSeconds(1) : rest)).append(")");
         }
         senden(chatId, text.toString());
     }
@@ -169,16 +202,22 @@ public class ErinnerungsBot {
     /** Läuft im Planer-Thread, wenn die Zeit um ist. */
     private void ausfuehren(long id) {
         try {
-            Erinnerung erinnerung = offen.remove(id);
-            if (erinnerung == null) {
-                return; // inzwischen abgebrochen
+            // Wer zuerst von OFFEN auf AUSGELOEST wechselt, gewinnt. Ein gleichzeitiges "Abbrechen" verliert dann.
+            if (!speicher.wechseln(id, Erinnerungsspeicher.Zustand.OFFEN, Erinnerungsspeicher.Zustand.AUSGELOEST)) {
+                return;
             }
-            ausgeloest.put(id, erinnerung);
+            abbrueche.remove(id);
+            Optional<Erinnerung> gefunden = speicher.finden(id, Erinnerungsspeicher.Zustand.AUSGELOEST);
+            if (gefunden.isEmpty()) {
+                return;
+            }
+            Erinnerung erinnerung = gefunden.get();
             // Der Status ist erledigt: aufräumen. Ist er schon weg oder zu alt, ist das kein Grund aufzuhören.
-            loeschen(erinnerung.chatId, erinnerung.statusNachrichtId);
+            loeschen(erinnerung.chatId(), erinnerung.statusNachrichtId());
 
-            ObjectNode parameter = TelegramClient.parameter()
-                    .put("chat_id", erinnerung.chatId).put("text", "⏰ Erinnerung: " + erinnerung.text);
+            boolean verspaetet = Duration.between(erinnerung.faelligUm(), uhr.instant()).compareTo(TOLERANZ) > 0;
+            ObjectNode parameter = TelegramClient.parameter().put("chat_id", erinnerung.chatId())
+                    .put("text", "⏰ Erinnerung: " + erinnerung.text() + (verspaetet ? " (verspätet)" : ""));
             parameter.set("reply_markup", Tastaturen.inline(List.of(List.of(
                     Taste.daten("Erledigt", "erledigt:" + id), Taste.daten("Später", "spaeter:" + id)))));
             // Eine neue Nachricht, denn nur sie benachrichtigt den Nutzer. Eine Bearbeitung bleibt still.
@@ -200,24 +239,29 @@ public class ErinnerungsBot {
 
         switch (daten[0]) {
             case "abbrechen" -> {
-                Erinnerung erinnerung = offen.get(id);
-                if (erinnerung != null && erinnerung.chatId == chatId && offen.remove(id, erinnerung)) {
-                    erinnerung.abbruch.run();
-                    textAendern(chatId, nachrichtId, "❌ Abgebrochen: " + erinnerung.text, null);
+                Optional<Erinnerung> erinnerung = speicher.finden(id, Erinnerungsspeicher.Zustand.OFFEN)
+                        .filter(e -> e.chatId() == chatId);
+                if (erinnerung.isPresent() && speicher.entfernen(id, Erinnerungsspeicher.Zustand.OFFEN)) {
+                    abbrueche.getOrDefault(id, () -> { }).run();
+                    abbrueche.remove(id);
+                    textAendern(chatId, nachrichtId, "❌ Abgebrochen: " + erinnerung.get().text(), null);
                     antwort = "Abgebrochen";
                 }
             }
             case "erledigt" -> {
-                Erinnerung erinnerung = ausgeloest.get(id);
-                if (erinnerung != null && erinnerung.chatId == chatId && ausgeloest.remove(id, erinnerung)) {
-                    textAendern(chatId, nachrichtId, "✅ Erledigt: " + erinnerung.text, null);
+                Optional<Erinnerung> erinnerung = speicher.finden(id, Erinnerungsspeicher.Zustand.AUSGELOEST)
+                        .filter(e -> e.chatId() == chatId);
+                if (erinnerung.isPresent() && speicher.entfernen(id, Erinnerungsspeicher.Zustand.AUSGELOEST)) {
+                    textAendern(chatId, nachrichtId, "✅ Erledigt: " + erinnerung.get().text(), null);
                     antwort = "Erledigt";
                 }
             }
             case "spaeter" -> {
-                Erinnerung erinnerung = ausgeloest.get(id);
-                if (erinnerung != null && erinnerung.chatId == chatId && ausgeloest.remove(id, erinnerung)) {
-                    verschieben(erinnerung, nachrichtId);
+                Optional<Erinnerung> erinnerung = speicher.finden(id, Erinnerungsspeicher.Zustand.AUSGELOEST)
+                        .filter(e -> e.chatId() == chatId);
+                if (erinnerung.isPresent() && speicher.wechseln(id, Erinnerungsspeicher.Zustand.AUSGELOEST,
+                        Erinnerungsspeicher.Zustand.OFFEN)) {
+                    verschieben(erinnerung.get(), nachrichtId);
                     antwort = "In " + Dauer.text(SPAETER) + " noch einmal";
                 }
             }
@@ -230,12 +274,10 @@ public class ErinnerungsBot {
     // #region verschieben
     /** Die Erinnerungsnachricht wird wieder zum Status: neuer Text, neue "Abbrechen"-Taste, neue Uhr. */
     private void verschieben(Erinnerung erinnerung, long nachrichtId) throws IOException, InterruptedException {
-        erinnerung.statusNachrichtId = nachrichtId;
-        erinnerung.faelligUm = uhr.instant().plus(SPAETER);
-        textAendern(erinnerung.chatId, nachrichtId,
-                "⏳ Erinnerung in " + Dauer.text(SPAETER) + ": " + erinnerung.text, abbrechenTaste(erinnerung.id));
-        offen.put(erinnerung.id, erinnerung);
-        erinnerung.abbruch = planer.planen(SPAETER, () -> ausfuehren(erinnerung.id));
+        speicher.aktualisieren(erinnerung.id(), nachrichtId, uhr.instant().plus(SPAETER));
+        textAendern(erinnerung.chatId(), nachrichtId,
+                "⏳ Erinnerung in " + Dauer.text(SPAETER) + ": " + erinnerung.text(), abbrechenTaste(erinnerung.id()));
+        planen(erinnerung.id(), SPAETER);
     }
     // #endregion verschieben
 

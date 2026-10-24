@@ -6,3 +6,7 @@ site/.vitepress/dist/
 .idea/
 *.iml
 .vscode/
+# SQLite-Datenbanken der Beispiele
+*.db
+*.db-wal
+*.db-shm

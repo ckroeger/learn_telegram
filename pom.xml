@@ -19,6 +19,8 @@
     <module>apps/telegram-client</module>
     <module>examples/05-interaktion</module>
     <module>apps/echo-befehls-bot</module>
+    <module>examples/07-bearbeiten-loeschen</module>
+    <module>apps/erinnerungs-bot</module>
   </modules>
 
   <properties>

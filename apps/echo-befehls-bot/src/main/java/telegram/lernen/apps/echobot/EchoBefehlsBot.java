@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import telegram.lernen.client.Befehl;
 import telegram.lernen.client.Tastaturen;
 import telegram.lernen.client.Tastaturen.Taste;
 import telegram.lernen.client.TelegramClient;

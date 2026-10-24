@@ -1,15 +1,15 @@
-package telegram.lernen.apps.echobot;
+package telegram.lernen.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Locale;
 import java.util.Optional;
 
 /** Ein Befehl am Anfang einer Nachricht, z. B. {@code /echo Hallo} oder {@code /hilfe@mein_bot}. */
-record Befehl(String name, String argumente) {
+public record Befehl(String name, String argumente) {
 
     // #region befehl
     /** Beginnt die Nachricht mit einem Befehl, egal an welchen Bot er gerichtet ist? */
-    static boolean beginntMitBefehl(JsonNode nachricht) {
+    public static boolean beginntMitBefehl(JsonNode nachricht) {
         for (JsonNode entitaet : nachricht.path("entities")) {
             if (entitaet.path("type").asText().equals("bot_command") && entitaet.path("offset").asInt() == 0) {
                 return true;
@@ -22,7 +22,7 @@ record Befehl(String name, String argumente) {
      * Telegram markiert Befehle als Entität {@code bot_command}. In Gruppen kann ein Befehl mit {@code @botname}
      * an einen bestimmten Bot gerichtet sein. Ist er an einen anderen Bot gerichtet, ist das Ergebnis leer.
      */
-    static Optional<Befehl> aus(JsonNode nachricht, String eigenerName) {
+    public static Optional<Befehl> aus(JsonNode nachricht, String eigenerName) {
         if (!beginntMitBefehl(nachricht)) {
             return Optional.empty();
         }

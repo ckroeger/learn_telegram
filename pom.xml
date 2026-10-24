@@ -21,6 +21,7 @@
     <module>examples/06-webhooks</module>
     <module>apps/echo-befehls-bot</module>
     <module>examples/07-bearbeiten-loeschen</module>
+    <module>examples/08-dateien</module>
     <module>apps/erinnerungs-bot</module>
   </modules>
 

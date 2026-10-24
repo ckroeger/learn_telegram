@@ -31,6 +31,7 @@ import java.util.regex.Pattern;
 public final class FakeTelegramServer implements AutoCloseable {
 
     private static final Pattern PFAD = Pattern.compile("^/bot([^/]*)/([A-Za-z]+)$");
+    private static final Pattern DATEI_PFAD = Pattern.compile("^/file/bot([^/]*)/(.+)$");
     private static final Pattern OFFSET = Pattern.compile("\"?offset\"?\\s*[:=]\\s*(-?\\d+)");
     private static final Pattern TIMEOUT = Pattern.compile("\"?timeout\"?\\s*[:=]\\s*(\\d+)");
     private static final long MAX_WARTEN_MS = 500;
@@ -49,6 +50,7 @@ public final class FakeTelegramServer implements AutoCloseable {
     private final List<RecordedRequest> aufrufe = new ArrayList<>();
     private final Map<String, Deque<Verhalten>> verhalten = new HashMap<>();
     private final Map<String, String> ergebnisse = new HashMap<>();
+    private final Map<String, byte[]> dateien = new HashMap<>();
     private long naechsteUpdateId = 1;
     private long naechsteNachrichtenId = 100;
 
@@ -125,6 +127,13 @@ public final class FakeTelegramServer implements AutoCloseable {
         }
     }
 
+    /** Stellt eine Datei zum Download unter {@code /file/bot<token>/<pfad>} bereit, wie es getFile ankündigt. */
+    public void dateiBereitstellen(String pfad, byte[] inhalt) {
+        synchronized (lock) {
+            dateien.put(pfad, inhalt.clone());
+        }
+    }
+
     // --- Aufzeichnung
 
     public List<RecordedRequest> requests() {
@@ -167,8 +176,14 @@ public final class FakeTelegramServer implements AutoCloseable {
 
     private void behandle(HttpExchange ex) throws IOException {
         try (ex) {
+            Matcher datei = DATEI_PFAD.matcher(ex.getRequestURI().getPath());
+            if (datei.matches()) {
+                herunterladen(ex, datei.group(1), datei.group(2));
+                return;
+            }
             Matcher pfad = PFAD.matcher(ex.getRequestURI().getPath());
-            String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            byte[] bytes = ex.getRequestBody().readAllBytes();
+            String body = new String(bytes, StandardCharsets.UTF_8);
             String query = ex.getRequestURI().getRawQuery() == null ? "" : ex.getRequestURI().getRawQuery();
             if (!pfad.matches()) {
                 antworte(ex, 404, nichtGefunden());
@@ -177,7 +192,7 @@ public final class FakeTelegramServer implements AutoCloseable {
             String token = pfad.group(1);
             String methode = pfad.group(2);
             synchronized (lock) {
-                aufrufe.add(new RecordedRequest(methode, token, query, body));
+                aufrufe.add(new RecordedRequest(methode, token, query, body, bytes));
                 lock.notifyAll();
             }
 
@@ -214,6 +229,24 @@ public final class FakeTelegramServer implements AutoCloseable {
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+        }
+    }
+
+    private void herunterladen(HttpExchange ex, String token, String pfad) throws IOException {
+        byte[] inhalt;
+        synchronized (lock) {
+            aufrufe.add(new RecordedRequest("file", token, "", pfad, new byte[0]));
+            lock.notifyAll();
+            inhalt = dateien.get(pfad);
+        }
+        if (inhalt == null) {
+            antworte(ex, 404, nichtGefunden());
+            return;
+        }
+        ex.getResponseHeaders().set("Content-Type", "application/octet-stream");
+        ex.sendResponseHeaders(200, inhalt.length);
+        try (OutputStream out = ex.getResponseBody()) {
+            out.write(inhalt);
         }
     }
 

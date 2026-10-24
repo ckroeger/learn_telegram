@@ -115,6 +115,38 @@ class FakeTelegramServerTest {
     }
 
     @Test
+    void bereitgestellteDateienLassenSichHerunterladenUndWerdenAufgezeichnet() throws Exception {
+        byte[] inhalt = {0, 1, 2, (byte) 0xFF, (byte) 0xFE, 10, 13};
+        fake.dateiBereitstellen("documents/file_1.bin", inhalt);
+
+        HttpRequest anfrage = HttpRequest.newBuilder(
+                URI.create(fake.baseUrl() + "/file/botTOKEN/documents/file_1.bin")).build();
+        HttpResponse<byte[]> antwort = http.send(anfrage, HttpResponse.BodyHandlers.ofByteArray());
+
+        assertEquals(200, antwort.statusCode());
+        assertTrue(java.util.Arrays.equals(inhalt, antwort.body()));
+        RecordedRequest aufruf = fake.requests("file").get(0);
+        assertEquals("TOKEN", aufruf.token());
+        assertEquals("documents/file_1.bin", aufruf.body());
+    }
+
+    @Test
+    void unbekannteDateienLiefern404() throws Exception {
+        HttpRequest anfrage = HttpRequest.newBuilder(URI.create(fake.baseUrl() + "/file/botTOKEN/gibt/es/nicht")).build();
+        assertEquals(404, http.send(anfrage, HttpResponse.BodyHandlers.ofString()).statusCode());
+    }
+
+    @Test
+    void rohbytesVonUploadsWerdenUnveraendertAufgezeichnet() throws Exception {
+        byte[] binaer = {0, (byte) 0x80, (byte) 0xFF, 1, 2, 3};
+        HttpRequest anfrage = HttpRequest.newBuilder(URI.create(fake.baseUrl() + "/botTOKEN/sendDocument"))
+                .POST(HttpRequest.BodyPublishers.ofByteArray(binaer)).build();
+        http.send(anfrage, HttpResponse.BodyHandlers.ofString());
+
+        assertTrue(java.util.Arrays.equals(binaer, fake.requests("sendDocument").get(0).bodyBytes()));
+    }
+
+    @Test
     void unbekannteMethodeLiefertOkFalseMit404() throws Exception {
         HttpResponse<String> antwort = post("gibtEsNicht", "{}");
         assertEquals(404, antwort.statusCode());

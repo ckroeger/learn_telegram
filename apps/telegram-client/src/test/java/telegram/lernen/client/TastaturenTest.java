@@ -63,4 +63,24 @@ class TastaturenTest {
         assertThrows(IllegalArgumentException.class, () -> new Taste("x", "a", null, "", null));
         assertThrows(IllegalArgumentException.class, () -> new Taste("x", null, null, "a", "b"));
     }
+
+    @Test
+    void webAppTastenBrauchenHttpsUndSindEineEigeneAktion() {
+        var markup = Tastaturen.inline(java.util.List.of(java.util.List.of(Taste.webApp("Öffnen", "https://beispiel.example/app"))));
+        var knopf = markup.get("inline_keyboard").get(0).get(0);
+        assertEquals("https://beispiel.example/app", knopf.at("/web_app/url").asText());
+        assertTrue(!knopf.has("url") && !knopf.has("callback_data"));
+        assertThrows(IllegalArgumentException.class, () -> Taste.webApp("x", "http://beispiel.example"));
+        assertThrows(IllegalArgumentException.class, () -> new Taste("x", "a", null, null, null, "https://b.example"));
+    }
+
+    @Test
+    void antwortTastaturMitWebApp() {
+        var markup = Tastaturen.antwortMitWebApp("Formular", "https://beispiel.example/app");
+
+        assertEquals("Formular", markup.at("/keyboard/0/0/text").asText());
+        assertEquals("https://beispiel.example/app", markup.at("/keyboard/0/0/web_app/url").asText());
+        assertTrue(markup.get("resize_keyboard").asBoolean());
+        assertThrows(IllegalArgumentException.class, () -> Tastaturen.antwortMitWebApp("x", "http://beispiel.example"));
+    }
 }

@@ -1,0 +1,36 @@
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: var(--tg-theme-bg-color, #ffffff);
+  color: var(--tg-theme-text-color, #000000);
+}
+main {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+}
+dt { color: var(--tg-theme-hint-color, #707579); }
+dd { margin: 0; overflow-wrap: anywhere; }
+label { display: block; margin-top: 1rem; }
+input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.6rem;
+  font-size: 1rem;
+  margin: 0.25rem 0 0.75rem;
+}
+button {
+  width: 100%;
+  padding: 0.8rem;
+  font-size: 1rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: var(--tg-theme-button-color, #3390ec);
+  color: var(--tg-theme-button-text-color, #ffffff);
+}
+button:disabled { opacity: 0.5; }

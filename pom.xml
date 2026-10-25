@@ -25,6 +25,7 @@
     <module>examples/07-bearbeiten-loeschen</module>
     <module>examples/08-dateien</module>
     <module>examples/09-inline-modus</module>
+    <module>examples/11-mini-apps</module>
     <module>apps/erinnerungs-bot</module>
   </modules>
 

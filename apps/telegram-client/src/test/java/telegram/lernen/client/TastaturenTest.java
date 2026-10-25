@@ -50,4 +50,17 @@ class TastaturenTest {
         assertThrows(IllegalArgumentException.class, () -> Taste.daten("x", ""));
         assertTrue(Taste.link("ok", "https://example.com").callbackData() == null);
     }
+
+    @Test
+    void inlineTastenSetzenSwitchInlineQueryUndErlaubenEineLeereAbfrage() {
+        var markup = Tastaturen.inline(java.util.List.of(java.util.List.of(
+                Taste.inlineInAnderemChat("Teilen", ""), Taste.inlineHier("Hier suchen", "sendMessage"))));
+
+        var tasten = markup.get("inline_keyboard").get(0);
+        assertEquals("", tasten.get(0).get("switch_inline_query").asText());
+        assertTrue(tasten.get(0).has("switch_inline_query") && !tasten.get(0).has("callback_data"));
+        assertEquals("sendMessage", tasten.get(1).get("switch_inline_query_current_chat").asText());
+        assertThrows(IllegalArgumentException.class, () -> new Taste("x", "a", null, "", null));
+        assertThrows(IllegalArgumentException.class, () -> new Taste("x", null, null, "a", "b"));
+    }
 }

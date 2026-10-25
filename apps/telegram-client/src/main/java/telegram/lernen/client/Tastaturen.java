@@ -14,15 +14,21 @@ public final class Tastaturen {
     private Tastaturen() {
     }
 
-    /** Eine Taste unter einer Nachricht: entweder mit {@code callback_data} oder mit {@code url}. */
-    public record Taste(String text, String callbackData, String url) {
+    /**
+     * Eine Taste unter einer Nachricht mit genau einer Aktion: {@code callback_data}, {@code url} oder ein Wechsel in
+     * den Inline-Modus ({@code switch_inline_query} wählt einen Chat, {@code switch_inline_query_current_chat} bleibt im
+     * aktuellen Chat). Die Abfrage für den Inline-Modus darf leer sein, dann wird nur der Botname eingesetzt.
+     */
+    public record Taste(String text, String callbackData, String url, String inlineAbfrage, String inlineAbfrageHier) {
 
         public Taste {
             if (text == null || text.isBlank()) {
                 throw new IllegalArgumentException("Eine Taste braucht einen Text");
             }
-            if ((callbackData == null) == (url == null)) {
-                throw new IllegalArgumentException("Genau eines von callback_data und url muss gesetzt sein");
+            int aktionen = (callbackData != null ? 1 : 0) + (url != null ? 1 : 0)
+                    + (inlineAbfrage != null ? 1 : 0) + (inlineAbfrageHier != null ? 1 : 0);
+            if (aktionen != 1) {
+                throw new IllegalArgumentException("Genau eine Aktion muss gesetzt sein (callback_data, url oder Inline-Abfrage)");
             }
             if (callbackData != null) {
                 int bytes = callbackData.getBytes(StandardCharsets.UTF_8).length;
@@ -32,12 +38,26 @@ public final class Tastaturen {
             }
         }
 
+        public Taste(String text, String callbackData, String url) {
+            this(text, callbackData, url, null, null);
+        }
+
         public static Taste daten(String text, String callbackData) {
             return new Taste(text, callbackData, null);
         }
 
         public static Taste link(String text, String url) {
             return new Taste(text, null, url);
+        }
+
+        /** Fragt nach einem Chat und setzt dort {@code @bot abfrage} ins Eingabefeld. */
+        public static Taste inlineInAnderemChat(String text, String abfrage) {
+            return new Taste(text, null, null, abfrage, null);
+        }
+
+        /** Setzt {@code @bot abfrage} ins Eingabefeld des aktuellen Chats. */
+        public static Taste inlineHier(String text, String abfrage) {
+            return new Taste(text, null, null, null, abfrage);
         }
     }
 
@@ -52,8 +72,12 @@ public final class Tastaturen {
                 ObjectNode knopf = json.addObject().put("text", taste.text());
                 if (taste.callbackData() != null) {
                     knopf.put("callback_data", taste.callbackData());
-                } else {
+                } else if (taste.url() != null) {
                     knopf.put("url", taste.url());
+                } else if (taste.inlineAbfrage() != null) {
+                    knopf.put("switch_inline_query", taste.inlineAbfrage());
+                } else {
+                    knopf.put("switch_inline_query_current_chat", taste.inlineAbfrageHier());
                 }
             }
         }

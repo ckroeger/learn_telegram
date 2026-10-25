@@ -21,8 +21,10 @@
     <module>examples/06-webhooks</module>
     <module>apps/echo-befehls-bot</module>
     <module>apps/quiz-bot</module>
+    <module>apps/inline-such-bot</module>
     <module>examples/07-bearbeiten-loeschen</module>
     <module>examples/08-dateien</module>
+    <module>examples/09-inline-modus</module>
     <module>apps/erinnerungs-bot</module>
   </modules>
 

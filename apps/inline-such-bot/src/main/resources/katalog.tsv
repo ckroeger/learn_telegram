@@ -1,0 +1,30 @@
+getMe	Liefert Name und Benutzername des Bots; der einfachste Test für den Token.
+getUpdates	Holt neue Updates per Long Polling ab.
+setWebhook	Meldet eine HTTPS-Adresse an, an die Telegram Updates schickt.
+deleteWebhook	Entfernt den Webhook, danach geht wieder getUpdates.
+getWebhookInfo	Zeigt, welcher Webhook gesetzt ist und welcher Fehler zuletzt auftrat.
+sendMessage	Sendet eine Textnachricht, optional mit Tasten.
+forwardMessage	Leitet eine Nachricht mit Hinweis auf den Absender weiter.
+copyMessage	Kopiert eine Nachricht ohne Hinweis auf den Absender.
+sendPhoto	Sendet ein Foto per file_id, URL oder Upload.
+sendDocument	Sendet eine Datei als Dokument.
+sendPoll	Sendet eine Umfrage oder ein Quiz.
+sendDice	Sendet einen Würfel oder eine andere Animation mit zufälligem Wert.
+sendLocation	Sendet einen Standort auf der Karte.
+sendChatAction	Zeigt "schreibt …" oder "sendet ein Foto …" im Chat an.
+editMessageText	Ändert den Text einer gesendeten Nachricht.
+deleteMessage	Löscht eine Nachricht.
+setMessageReaction	Setzt eine Reaktion auf eine Nachricht.
+answerCallbackQuery	Beantwortet den Klick auf eine Inline-Taste.
+answerInlineQuery	Antwortet auf eine Inline-Abfrage mit Ergebnissen.
+setMyCommands	Meldet die Befehlsliste des Bots an.
+getFile	Liefert den Pfad, unter dem eine Datei herunterladbar ist.
+stopPoll	Beendet eine Umfrage des Bots.
+getChat	Liefert Informationen über einen Chat.
+getChatMember	Liefert Status und Rechte eines Mitglieds.
+banChatMember	Sperrt ein Mitglied in einer Gruppe oder einem Kanal.
+restrictChatMember	Schränkt die Rechte eines Mitglieds in einer Supergruppe ein.
+pinChatMessage	Pinnt eine Nachricht im Chat.
+sendInvoice	Sendet eine Rechnung für eine Zahlung.
+answerPreCheckoutQuery	Bestätigt oder verweigert eine Zahlung kurz vor dem Abschluss.
+setChatMenuButton	Stellt die Menütaste des Chats ein, zum Beispiel für eine Mini App.
